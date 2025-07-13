@@ -17,50 +17,31 @@ function syncRecords() {
  */
 function updateAllManufacturerStockSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var recordSheet = ss.getSheetByName('입/출고 기록');
-  var data = recordSheet.getDataRange().getValues();
+  var stockSheet = ss.getSheetByName('현재고 정보');
+  var data = stockSheet.getDataRange().getValues();
   if (data.length < 2) return;
 
   // 1. 제조사별, 사이즈별로 재고 및 유효기간 집계
-  // (컬럼 인덱스는 실제 시트 구조에 맞게 조정 필요)
-  // 0:입고날짜, 1:출고날짜, 2:바코드, 3:제품명, 4:사이즈, 5:모델타입, 6:제조사, 7:제조일자, 8:유효기간
+  // 0:입고날짜, 1:바코드, 2:모델타입, 3:사이즈, 4:제조번호, 5:제작사, 6:제조일자, 7:유효기간
   var stockMap = {}; // { 제조사: { 사이즈: { modelType, count, expDates: [] } } }
-  for (var i = 2; i < data.length; i++) { // 2행부터 데이터 시작
+  for (var i = 1; i < data.length; i++) { // 1행부터 데이터 시작(헤더 제외)
     var row = data[i];
-    var inDate = row[0];
-    var outDate = row[1];
-    var barcode = row[2];
-    var size = row[4];
-    var modelType = row[5];
-    var maker = row[6];
-    var expDate = row[8];
+    var modelType = row[2];
+    var size = row[3];
+    var maker = row[5];
+    var expDate = row[7];
     if (!size || !maker) continue;
-
-    // 입고/출고/사용 구분
-    var isIn = inDate && !outDate;
-    var isOut = outDate && !inDate;
 
     if (!stockMap[maker]) stockMap[maker] = {};
     if (!stockMap[maker][size]) stockMap[maker][size] = { modelType: modelType, count: 0, expDates: [] };
-    // 모델타입이 여러개면 가장 마지막 값으로 덮어씀(동일 사이즈에 여러 모델타입이 있을 경우)
     stockMap[maker][size].modelType = modelType;
-
-    if (isIn) {
-      stockMap[maker][size].count += 1;
-      if (expDate) stockMap[maker][size].expDates.push(expDate);
-    } else if (isOut) {
-      stockMap[maker][size].count -= 1;
-      // 출고된 유효기간은 제외(가장 짧은 유효기간 계산에서)
-      if (expDate) {
-        var idx = stockMap[maker][size].expDates.indexOf(expDate);
-        if (idx !== -1) stockMap[maker][size].expDates.splice(idx, 1);
-      }
-    }
+    stockMap[maker][size].count += 1;
+    if (expDate) stockMap[maker][size].expDates.push(expDate);
   }
 
   // 2. 제조사별 재고표 시트 생성/업데이트
   Object.keys(stockMap).forEach(function(maker) {
-    var sheetName = maker + '재고표';
+    var sheetName = '(' + maker + ')재고표';
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
@@ -76,7 +57,23 @@ function updateAllManufacturerStockSheets() {
       var expDates = sizeMap[size].expDates;
       var minExp = '';
       if (expDates.length > 0) {
-        minExp = expDates.sort()[0];
+        var dateObjs = expDates
+          .map(function(d) {
+            if (typeof d !== 'string') return null;
+            if (d.length === 6) {
+              return new Date('20' + d.substr(0,2) + '-' + d.substr(2,2) + '-' + d.substr(4,2));
+            }
+            return new Date(d.replace(/\./g, '-'));
+          })
+          .filter(function(dt) { return dt && !isNaN(dt.getTime()); });
+        if (dateObjs.length > 0) {
+          var minDate = new Date(Math.min.apply(null, dateObjs));
+          minExp = expDates[dateObjs.findIndex(function(dt) {
+            return dt && dt.getTime() === minDate.getTime();
+          })];
+        } else {
+          minExp = expDates[0];
+        }
       }
       sheet.appendRow([modelType, size, count, minExp]);
     });

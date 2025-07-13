@@ -6,6 +6,7 @@ function onOpen() {
     .createMenu('재고관리')
     .addItem('입고처리', 'handleStockIn')
     .addItem('출고처리', 'handleStockOut')
+    .addItem('재고표갱신', 'updateAllManufacturerStockSheets') // 재고표 갱신 메뉴 추가
     .addToUi();
 }
 

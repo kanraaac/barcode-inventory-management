@@ -21,11 +21,11 @@
       var info = parseBarcode(barcode);
       // 현재고 정보에서 3가지 정보로 매칭
       var stockData = sheetStock.getDataRange().getValues();
+      // 현재고 정보에서 전체 바코드 일치로만 출고 가능하도록 수정
       var foundRow = null;
       for (var j = 1; j < stockData.length; j++) {
         var stockBarcode = stockData[j][1];
-        var stockInfo = parseBarcode(stockBarcode);
-        if (stockInfo.model === info.model && stockInfo.expDate === info.expDate && stockInfo.maker === info.maker) {
+        if (stockBarcode === barcode) { // 전체 바코드 일치
           foundRow = j + 1;
           break;
         }
@@ -55,8 +55,6 @@
       sheetStock.deleteRow(foundRow);
       sheetOut.getRange('B' + i).setValue('출고처리 완료');
     }
-    // 출고처리 후 제조사 재고표 자동 업데이트
-    updateAllManufacturerStockSheets();
   }
 
   /**
@@ -79,11 +77,11 @@
       var info = parseBarcode(barcode);
       // 현재고 정보에서 3가지 정보로 매칭
       var stockData = sheetStock.getDataRange().getValues();
+      // 현재고 정보에서 전체 바코드 일치로만 출고 가능하도록 수정
       var foundRow = null;
       for (var j = 1; j < stockData.length; j++) {
         var stockBarcode = stockData[j][1];
-        var stockInfo = parseBarcode(stockBarcode);
-        if (stockInfo.model === info.model && stockInfo.expDate === info.expDate && stockInfo.maker === info.maker) {
+        if (stockBarcode === barcode) { // 전체 바코드 일치
           foundRow = j + 1;
           break;
         }
@@ -113,6 +111,4 @@
       sheetStock.deleteRow(foundRow);
       sheetOut.getRange('B' + i).setValue('사용입력 완료');
     }
-    // 사용입력 후 제조사 재고표 자동 업데이트
-    updateAllManufacturerStockSheets();
   }

@@ -22,7 +22,23 @@ function findBarcodeRowByInfo(sheet, model, expDate, maker) {
 }
 
 /**
- * 바코드 정보 시트에 해당 바코드(모델+유효기간+제조사)가 없으면 자동으로 신규 행을 추가
+ * 바코드 정보 시트에서 전체 바코드 일치로 행 찾기
+ * @param {Sheet} sheet
+ * @param {string} barcode
+ * @returns {number|null} 실제 row 번호
+ */
+function findBarcodeRowByBarcode(sheet, barcode) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === barcode) {
+      return i + 1; // 시트의 실제 row 번호
+    }
+  }
+  return null;
+}
+
+/**
+ * 바코드 정보 시트에 해당 바코드가 없으면 자동으로 신규 행을 추가
  * @param {Sheet} sheetBarcode
  * @param {string} barcode
  * @param {object} info (parseBarcode 결과)
@@ -30,15 +46,12 @@ function findBarcodeRowByInfo(sheet, model, expDate, maker) {
  */
 function addBarcodeInfoIfNotExist(sheetBarcode, barcode, info) {
   try {
+    var row = findBarcodeRowByBarcode(sheetBarcode, barcode);
+    if (row) return row; // 이미 있으면 해당 행 반환
     var lastRow = sheetBarcode.getLastRow();
-    // 바코드 정보 시트의 헤더는 2행까지라고 가정(3행부터 데이터)
     var newRow = lastRow + 1;
-    // 사이즈 정보 추출(신규 모델이면 getSizeByModel에서 prompt 발생)
     var size = getSizeByModel(info.model, info.serialNo);
-    // 바코드 정보 시트 컬럼: 바코드, (B:제품명/타입), C:사이즈, D:?, E:제작사, F:제조일자, G:유효기간
-    // B열(제품명/타입)은 일단 빈 값, C열:사이즈, E열:제작사, F열:제조일자, G열:유효기간
     sheetBarcode.getRange(newRow, 1).setValue(barcode); // A: 바코드
-    // B열(제품명/타입)은 드롭다운 필요시 main.gs의 setProductTypeDropdown 활용
     if (info.typeList && info.typeList.length > 0) {
       setProductTypeDropdown(newRow, info.typeList);
     }
@@ -72,19 +85,17 @@ function handleStockIn() {
     var barcode = sheetInput.getRange('A' + i).getValue();
     if (!barcode) continue;
     var info = parseBarcode(barcode);
-    var row = findBarcodeRowByInfo(sheetBarcode, info.model, info.expDate, info.maker);
+    var row = findBarcodeRowByBarcode(sheetBarcode, barcode);
     // 바코드 정보가 없으면 자동 등록 후 재조회
     if (!row) {
       try {
         row = addBarcodeInfoIfNotExist(sheetBarcode, barcode, info);
-        // 안내 메시지: 신규 바코드 정보 자동 등록됨
         sheetInput.getRange('B' + i).setValue('신규 박스정보 자동등록');
       } catch (err) {
         sheetInput.getRange('B' + i).setValue('바코드 정보 등록 오류');
         continue;
       }
-      // 등록 후, 다시 row를 찾음(정상적으로 등록되었는지 확인)
-      row = findBarcodeRowByInfo(sheetBarcode, info.model, info.expDate, info.maker);
+      row = findBarcodeRowByBarcode(sheetBarcode, barcode);
       if (!row) {
         sheetInput.getRange('B' + i).setValue('바코드 정보 등록 실패');
         continue;
@@ -95,8 +106,7 @@ function handleStockIn() {
     var isExist = false;
     for (var j = 1; j < stockData.length; j++) {
       var stockBarcode = stockData[j][1];
-      var stockInfo = parseBarcode(stockBarcode);
-      if (stockInfo.model === info.model && stockInfo.expDate === info.expDate && stockInfo.maker === info.maker) {
+      if (stockBarcode === barcode) { // 전체 바코드가 완전히 일치할 때만
         isExist = true;
         break;
       }
@@ -108,6 +118,7 @@ function handleStockIn() {
     // 입고 처리: 현재고 정보 시트에 추가
     // 바코드 정보 시트의 해당 행 전체 데이터 읽기
     var barcodeRow = sheetBarcode.getRange(row, 1, 1, sheetBarcode.getLastColumn()).getValues()[0];
+    barcodeRow[0] = barcode; // 반드시 입고입력에서 입력한 바코드로 대입
     // 입고날짜(오늘 날짜) + 바코드 정보 전체 컬럼을 합쳐서 현재고 정보에 입력
     var newRow = [new Date()].concat(barcodeRow);
     sheetStock.insertRowsBefore(2, 1); // 2행(헤더 아래)에 삽입
@@ -123,8 +134,6 @@ function handleStockIn() {
     // 셀 배경을 명시적으로 흰색으로 지정 (A~L열 전체)
     sheetRecord.getRange(2, 1, 1, 12).setBackground('#FFFFFF');
   }
-  // 입고처리 후 제조사 재고표 자동 업데이트
-  updateAllManufacturerStockSheets();
 }
 
 /**
