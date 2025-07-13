@@ -2,11 +2,12 @@
 // "모델사이즈맵" 시트에 영구 저장, [모델코드, 사이즈, 타입] 3컬럼
 
 /**
- * 모델코드로 사이즈와 타입을 반환. 없으면 다이얼로그로 입력받아 시트에 자동 추가
+ * 모델코드와 제조번호로 사이즈와 타입을 반환. 없으면 다이얼로그로 입력받아 시트에 자동 추가
  * @param {string} model
- * @returns {{size: string, type: string}}
+ * @param {string} serialNo
+ * @returns {string} 사이즈
  */
-function getSizeByModel(model) {
+function getSizeByModel(model, serialNo) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('모델사이즈맵');
   if (!sheet) {
@@ -22,9 +23,10 @@ function getSizeByModel(model) {
   if (map[model]) {
     return map[model];
   }
-  // 없으면 prompt로 사이즈 입력받아 시트에 추가
+  // 없으면 prompt로 사이즈 입력받아 시트에 추가 (제조번호 표시)
   var ui = SpreadsheetApp.getUi();
-  var response = ui.prompt('신규 모델코드 발견', '모델코드 ' + model + '에 해당하는 사이즈를 입력하세요.', ui.ButtonSet.OK_CANCEL);
+  var msg = '제조번호: ' + (serialNo || '-') + '\n해당 제조번호에 맞는 사이즈를 입력하세요.';
+  var response = ui.prompt('신규 모델/제조번호 발견', msg, ui.ButtonSet.OK_CANCEL);
   if (response.getSelectedButton() == ui.Button.OK) {
     var size = response.getResponseText();
     if (size) {

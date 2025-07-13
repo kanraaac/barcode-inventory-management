@@ -27,6 +27,8 @@ function parseBarcode(barcode) {
   if (maker === '디오') {
     // 디오: 제품모델 11~16(5자리), 기준위치 31 이후 11/17
     model = barcode.substring(11, 16);
+    // 제조번호: 19~31(12자리, 예: 241025P04025)
+    var serialNo = barcode.substring(18, 30); // 19~30(1-based)
     var searchStart = 31;
     var rest = barcode.substring(searchStart);
     var mfgIdx = rest.indexOf('11');
@@ -57,5 +59,5 @@ function parseBarcode(barcode) {
     var typeList = [];
   }
 
-  return { model: model, mfgDate: mfgDateRaw, expDate: expDateRaw, maker: maker, typeList: typeList };
+  return { model: model, mfgDate: mfgDateRaw, expDate: expDateRaw, maker: maker, typeList: typeList, serialNo: serialNo };
 }

@@ -22,6 +22,39 @@ function findBarcodeRowByInfo(sheet, model, expDate, maker) {
 }
 
 /**
+ * 바코드 정보 시트에 해당 바코드(모델+유효기간+제조사)가 없으면 자동으로 신규 행을 추가
+ * @param {Sheet} sheetBarcode
+ * @param {string} barcode
+ * @param {object} info (parseBarcode 결과)
+ * @returns {number} 추가된 행의 row 번호
+ */
+function addBarcodeInfoIfNotExist(sheetBarcode, barcode, info) {
+  try {
+    var lastRow = sheetBarcode.getLastRow();
+    // 바코드 정보 시트의 헤더는 2행까지라고 가정(3행부터 데이터)
+    var newRow = lastRow + 1;
+    // 사이즈 정보 추출(신규 모델이면 getSizeByModel에서 prompt 발생)
+    var size = getSizeByModel(info.model, info.serialNo);
+    // 바코드 정보 시트 컬럼: 바코드, (B:제품명/타입), C:사이즈, D:?, E:제작사, F:제조일자, G:유효기간
+    // B열(제품명/타입)은 일단 빈 값, C열:사이즈, E열:제작사, F열:제조일자, G열:유효기간
+    sheetBarcode.getRange(newRow, 1).setValue(barcode); // A: 바코드
+    // B열(제품명/타입)은 드롭다운 필요시 main.gs의 setProductTypeDropdown 활용
+    if (info.typeList && info.typeList.length > 0) {
+      setProductTypeDropdown(newRow, info.typeList);
+    }
+    sheetBarcode.getRange(newRow, 3).setValue(size); // C: 사이즈
+    sheetBarcode.getRange(newRow, 4).setValue(info.serialNo || ''); // D: 제조번호
+    sheetBarcode.getRange(newRow, 5).setValue(info.maker); // E: 제작사
+    sheetBarcode.getRange(newRow, 6).setValue(formatDate(info.mfgDate)); // F: 제조일자
+    sheetBarcode.getRange(newRow, 7).setValue(formatDate(info.expDate)); // G: 유효기간
+    return newRow;
+  } catch (err) {
+    logError('addBarcodeInfoIfNotExist', err);
+    throw err;
+  }
+}
+
+/**
  * 입고입력 시트에서 바코드 입력 후 입고 처리
  * - 3가지 정보(제품모델+유효기간+제조사)만 일치하면 입고 가능
  * - 예외처리 및 안내 메시지 포함
@@ -40,9 +73,22 @@ function handleStockIn() {
     if (!barcode) continue;
     var info = parseBarcode(barcode);
     var row = findBarcodeRowByInfo(sheetBarcode, info.model, info.expDate, info.maker);
+    // 바코드 정보가 없으면 자동 등록 후 재조회
     if (!row) {
-      sheetInput.getRange('B' + i).setValue('일치 박스정보 없음');
-      continue;
+      try {
+        row = addBarcodeInfoIfNotExist(sheetBarcode, barcode, info);
+        // 안내 메시지: 신규 바코드 정보 자동 등록됨
+        sheetInput.getRange('B' + i).setValue('신규 박스정보 자동등록');
+      } catch (err) {
+        sheetInput.getRange('B' + i).setValue('바코드 정보 등록 오류');
+        continue;
+      }
+      // 등록 후, 다시 row를 찾음(정상적으로 등록되었는지 확인)
+      row = findBarcodeRowByInfo(sheetBarcode, info.model, info.expDate, info.maker);
+      if (!row) {
+        sheetInput.getRange('B' + i).setValue('바코드 정보 등록 실패');
+        continue;
+      }
     }
     // 현재고 정보에 이미 있으면 중복 안내
     var stockData = sheetStock.getDataRange().getValues();
@@ -73,7 +119,6 @@ function handleStockIn() {
     sheetRecord.getRange(4, 2).setValue(''); // 출고날짜는 빈 값
     sheetRecord.getRange(4, 3, 1, barcodeRow.length).setValues([barcodeRow]);
   }
-  ui.alert('입고처리 완료');
 }
 
 /**

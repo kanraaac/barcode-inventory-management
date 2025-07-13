@@ -103,10 +103,11 @@ function autoFillBarcodeInfo(e) {
   if (!barcode) return;
 
   var info = parseBarcode(barcode); // barcode_parser.gs의 함수 사용
-  var size = getSizeByModel(info.model); // model_size_db.gs의 함수 사용
+  var size = getSizeByModel(info.model, info.serialNo); // model_size_db.gs의 함수 사용
 
-  // C열(사이즈), E열(제작사), F열(제조일자), G열(유효기간) 자동 입력
+  // C열(사이즈), D열(제조번호), E열(제작사), F열(제조일자), G열(유효기간) 자동 입력
   sheet.getRange(row, 3).setValue(size);         // C열: 사이즈
+  sheet.getRange(row, 4).setValue(info.serialNo || ''); // D열: 제조번호
   sheet.getRange(row, 5).setValue(info.maker);   // E열: 제작사
   sheet.getRange(row, 6).setValue(formatDate(info.mfgDate)); // F열: 제조일자
   sheet.getRange(row, 7).setValue(formatDate(info.expDate)); // G열: 유효기간
