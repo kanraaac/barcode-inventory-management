@@ -16,27 +16,35 @@ function syncRecords() {
  * - 입고는 +1, 출고/사용은 -1로 집계
  */
 function updateAllManufacturerStockSheets() {
+  // 모델타입별 색상 매핑 테이블 (전체 문자열 기준)
+  var MODEL_TYPE_COLORS = {
+    'UF2': '#B3E5FC', // 밝은 하늘색
+    'UF3': '#E3F2FD', // 더 밝은 하늘색
+    'UV3': '#FFF9C4', // 밝은 노랑
+    // 필요시 추가
+  };
+  var DEFAULT_COLOR = '#FFFFFF';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var stockSheet = ss.getSheetByName('현재고 정보');
   var data = stockSheet.getDataRange().getValues();
   if (data.length < 2) return;
 
-  // 1. 제조사별, 사이즈별로 재고 및 유효기간 집계
+  // 1. 제조사별, 모델타입별, 사이즈별로 재고 및 유효기간 집계
   // 0:입고날짜, 1:바코드, 2:모델타입, 3:사이즈, 4:제조번호, 5:제작사, 6:제조일자, 7:유효기간
-  var stockMap = {}; // { 제조사: { 사이즈: { modelType, count, expDates: [] } } }
+  var stockMap = {}; // { 제조사: { 모델타입: { 사이즈: { count, expDates: [] } } } }
   for (var i = 1; i < data.length; i++) { // 1행부터 데이터 시작(헤더 제외)
     var row = data[i];
     var modelType = row[2];
     var size = row[3];
     var maker = row[5];
     var expDate = row[7];
-    if (!size || !maker) continue;
+    if (!size || !maker || !modelType) continue;
 
     if (!stockMap[maker]) stockMap[maker] = {};
-    if (!stockMap[maker][size]) stockMap[maker][size] = { modelType: modelType, count: 0, expDates: [] };
-    stockMap[maker][size].modelType = modelType;
-    stockMap[maker][size].count += 1;
-    if (expDate) stockMap[maker][size].expDates.push(expDate);
+    if (!stockMap[maker][modelType]) stockMap[maker][modelType] = {};
+    if (!stockMap[maker][modelType][size]) stockMap[maker][modelType][size] = { count: 0, expDates: [] };
+    stockMap[maker][modelType][size].count += 1;
+    if (expDate) stockMap[maker][modelType][size].expDates.push(expDate);
   }
 
   // 2. 제조사별 재고표 시트 생성/업데이트
@@ -50,32 +58,38 @@ function updateAllManufacturerStockSheets() {
       sheet.clearContents();
       sheet.appendRow(['모델타입', '사이즈', '재고수량', '가장 짧은 유효기간']);
     }
-    var sizeMap = stockMap[maker];
-    Object.keys(sizeMap).forEach(function(size) {
-      var modelType = sizeMap[size].modelType;
-      var count = sizeMap[size].count;
-      var expDates = sizeMap[size].expDates;
-      var minExp = '';
-      if (expDates.length > 0) {
-        var dateObjs = expDates
-          .map(function(d) {
-            if (typeof d !== 'string') return null;
-            if (d.length === 6) {
-              return new Date('20' + d.substr(0,2) + '-' + d.substr(2,2) + '-' + d.substr(4,2));
-            }
-            return new Date(d.replace(/\./g, '-'));
-          })
-          .filter(function(dt) { return dt && !isNaN(dt.getTime()); });
-        if (dateObjs.length > 0) {
-          var minDate = new Date(Math.min.apply(null, dateObjs));
-          minExp = expDates[dateObjs.findIndex(function(dt) {
-            return dt && dt.getTime() === minDate.getTime();
-          })];
-        } else {
-          minExp = expDates[0];
+    var typeMap = stockMap[maker];
+    Object.keys(typeMap).forEach(function(modelType) {
+      var sizeMap = typeMap[modelType];
+      Object.keys(sizeMap).forEach(function(size) {
+        var count = sizeMap[size].count;
+        var expDates = sizeMap[size].expDates;
+        var minExp = '';
+        if (expDates.length > 0) {
+          var dateObjs = expDates
+            .map(function(d) {
+              if (typeof d !== 'string') return null;
+              if (d.length === 6) {
+                return new Date('20' + d.substr(0,2) + '-' + d.substr(2,2) + '-' + d.substr(4,2));
+              }
+              return new Date(d.replace(/\./g, '-'));
+            })
+            .filter(function(dt) { return dt && !isNaN(dt.getTime()); });
+          if (dateObjs.length > 0) {
+            var minDate = new Date(Math.min.apply(null, dateObjs));
+            minExp = expDates[dateObjs.findIndex(function(dt) {
+              return dt && dt.getTime() === minDate.getTime();
+            })];
+          } else {
+            minExp = expDates[0];
+          }
         }
-      }
-      sheet.appendRow([modelType, size, count, minExp]);
+        sheet.appendRow([modelType, size, count, minExp]);
+        // 모델타입별 셀 배경색 지정 (전체 문자열 기준)
+        var rowIdx = sheet.getLastRow();
+        var color = MODEL_TYPE_COLORS[modelType] || DEFAULT_COLOR;
+        sheet.getRange(rowIdx, 1, 1, 4).setBackground(color);
+      });
     });
   });
 }

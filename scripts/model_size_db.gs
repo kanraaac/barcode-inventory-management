@@ -46,3 +46,21 @@ function getSizeByModel(model, serialNo) {
   }
   return '';
 }
+
+/**
+ * 모델코드로 모델타입(B열)을 반환
+ * @param {string} model
+ * @returns {string} 모델타입
+ */
+function getTypeByModel(model) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('모델사이즈맵');
+  if (!sheet) return '';
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === model) {
+      return data[i][1] || '';
+    }
+  }
+  return '';
+}
