@@ -9,8 +9,8 @@
 function parseBarcode(barcode) {
   var maker = '';
   var model = '';
-  var mfgDateRaw = '';
-  var expDateRaw = '';
+  var mfgDate = '';
+  var expDate = '';
 
   // 1. 제조사 판별
   if (barcode && barcode.startsWith('01088000494')) {
@@ -26,19 +26,12 @@ function parseBarcode(barcode) {
   // 2. 제조사별 바코드 파싱 규칙 분기
   if (maker === '디오') {
     // 디오: 제품모델 11~16(5자리), 기준위치 31 이후 11/17
-    model = barcode.substring(11, 16);
+    model = barcode.substring(11, 16); // 제품모델 코드 추출 (예: UF3A1)
     // 제조번호: 19~31(12자리, 예: 241025P04025)
-    var serialNo = barcode.substring(18, 30); // 19~30(1-based)
-    var searchStart = 31;
-    var rest = barcode.substring(searchStart);
-    var mfgIdx = rest.indexOf('11');
-    var expIdx = rest.indexOf('17');
-    if (mfgIdx !== -1 && rest.length >= mfgIdx + 8) {
-      mfgDateRaw = rest.substring(mfgIdx + 2, mfgIdx + 8);
-    }
-    if (expIdx !== -1 && rest.length >= expIdx + 8) {
-      expDateRaw = rest.substring(expIdx + 2, expIdx + 8);
-    }
+    var serialNo = barcode.substring(18, 30); // 제조번호 추출 (예: 241025P04025)
+    var mfgDate = barcode.substring(32, 38);  // 제조일자(6자리)
+    var expDate = barcode.substring(40, 46);  // 유효기간(6자리)
+
     // 디오 타입 드롭다운 값
     var typeList = ['UF3', 'UF2', 'UV3'];
     
@@ -59,5 +52,5 @@ function parseBarcode(barcode) {
     var typeList = [];
   }
 
-  return { model: model, mfgDate: mfgDateRaw, expDate: expDateRaw, maker: maker, typeList: typeList, serialNo: serialNo };
+  return { model: model, mfgDate: mfgDate, expDate: expDate, maker: maker, typeList: typeList, serialNo: serialNo };
 }
