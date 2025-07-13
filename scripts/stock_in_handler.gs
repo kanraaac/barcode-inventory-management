@@ -110,19 +110,21 @@ function handleStockIn() {
     var barcodeRow = sheetBarcode.getRange(row, 1, 1, sheetBarcode.getLastColumn()).getValues()[0];
     // 입고날짜(오늘 날짜) + 바코드 정보 전체 컬럼을 합쳐서 현재고 정보에 입력
     var newRow = [new Date()].concat(barcodeRow);
-    sheetStock.insertRowsBefore(3, 1);
-    sheetStock.getRange(3, 1, 1, newRow.length).setValues([newRow]);
+    sheetStock.insertRowsBefore(2, 1); // 2행(헤더 아래)에 삽입
+    sheetStock.getRange(2, 1, 1, newRow.length).setValues([newRow]);
     // 셀 배경을 명시적으로 흰색으로 지정
-    sheetStock.getRange(3, 1, 1, newRow.length).setBackground('#FFFFFF');
+    sheetStock.getRange(2, 1, 1, newRow.length).setBackground('#FFFFFF');
     sheetInput.getRange('B' + i).setValue('입고처리 완료');
     // 입/출고 기록 시트에도 추가
-    sheetRecord.insertRowsBefore(4, 1);
-    sheetRecord.getRange(4, 1).setValue(new Date()); // 입고날짜
-    sheetRecord.getRange(4, 2).setValue(''); // 출고날짜는 빈 값
-    sheetRecord.getRange(4, 3, 1, barcodeRow.length).setValues([barcodeRow]);
-    // 셀 배경을 명시적으로 흰색으로 지정
-    sheetRecord.getRange(4, 1, 1, barcodeRow.length + 2).setBackground('#FFFFFF');
+    sheetRecord.insertRowsBefore(2, 1); // 2행(헤더 아래)에 삽입
+    sheetRecord.getRange(2, 1).setValue(new Date()); // 입고날짜
+    sheetRecord.getRange(2, 2).setValue(''); // 출고날짜는 빈 값
+    sheetRecord.getRange(2, 3, 1, barcodeRow.length).setValues([barcodeRow]);
+    // 셀 배경을 명시적으로 흰색으로 지정 (A~L열 전체)
+    sheetRecord.getRange(2, 1, 1, 12).setBackground('#FFFFFF');
   }
+  // 입고처리 후 제조사 재고표 자동 업데이트
+  updateAllManufacturerStockSheets();
 }
 
 /**
