@@ -42,11 +42,15 @@ function handleStockOut() {
     sheetHistory.getRange(3, 1).setValue(new Date()); // 출고날짜
     sheetHistory.getRange(3, 2).setValue(barcode);    // 바코드번호
     sheetHistory.getRange(3, 3, 1, stockRow.length).setValues([stockRow]);
+    // 셀 배경을 명시적으로 흰색으로 지정
+    sheetHistory.getRange(3, 1, 1, stockRow.length + 2).setBackground('#FFFFFF');
     // 입/출고 기록 시트에 입력
     sheetRecord.insertRowsBefore(4, 1);
     sheetRecord.getRange(4, 1).setValue('');          // 입고날짜 없음
     sheetRecord.getRange(4, 2).setValue(new Date());  // 출고날짜
     sheetRecord.getRange(4, 3, 1, stockRow.length + 1).setValues([[barcode].concat(stockRow)]);
+    // 셀 배경을 명시적으로 흰색으로 지정
+    sheetRecord.getRange(4, 1, 1, stockRow.length + 2).setBackground('#FFFFFF');
     // 현재고 정보에서 삭제
     sheetStock.deleteRow(foundRow);
     sheetOut.getRange('B' + i).setValue('출고처리 완료');

@@ -112,12 +112,16 @@ function handleStockIn() {
     var newRow = [new Date()].concat(barcodeRow);
     sheetStock.insertRowsBefore(3, 1);
     sheetStock.getRange(3, 1, 1, newRow.length).setValues([newRow]);
+    // 셀 배경을 명시적으로 흰색으로 지정
+    sheetStock.getRange(3, 1, 1, newRow.length).setBackground('#FFFFFF');
     sheetInput.getRange('B' + i).setValue('입고처리 완료');
     // 입/출고 기록 시트에도 추가
     sheetRecord.insertRowsBefore(4, 1);
     sheetRecord.getRange(4, 1).setValue(new Date()); // 입고날짜
     sheetRecord.getRange(4, 2).setValue(''); // 출고날짜는 빈 값
     sheetRecord.getRange(4, 3, 1, barcodeRow.length).setValues([barcodeRow]);
+    // 셀 배경을 명시적으로 흰색으로 지정
+    sheetRecord.getRange(4, 1, 1, barcodeRow.length + 2).setBackground('#FFFFFF');
   }
 }
 
