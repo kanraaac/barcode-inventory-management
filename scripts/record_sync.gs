@@ -10,20 +10,82 @@ function syncRecords() {
   }
 }
 
+// HSL → HEX 변환 함수
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  let c = (1 - Math.abs(2 * l - 1)) * s;
+  let x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  let m = l - c/2;
+  let r = 0, g = 0, b = 0;
+  if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+  else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+  else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+  else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+  else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+  else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+  r = Math.round((r + m) * 255);
+  g = Math.round((g + m) * 255);
+  b = Math.round((b + m) * 255);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+// 모델타입별 고유 색상 생성 함수 (HEX 반환)
+function getColorByModelType(modelType) {
+  var hash = 0;
+  for (var i = 0; i < modelType.length; i++) {
+    hash = (hash * 31 + modelType.charCodeAt(i)) % 360;
+  }
+  return hslToHex(hash, 60, 85); // 밝고 부드러운 색상
+}
+
+// 유효기간 배열에서 가장 임박한(가장 빠른) 날짜를 찾는 함수
+function getEarliestExpDate(expDates) {
+  var minDate = null;
+  var minRaw = '';
+  expDates.forEach(function(d) {
+    var dt = null;
+    if (typeof d !== 'string') return;
+    if (d.length === 6 && /^\d{6}$/.test(d)) {
+      // YYMMDD → YYYY-MM-DD
+      dt = new Date('20' + d.substr(0,2) + '-' + d.substr(2,2) + '-' + d.substr(4,2));
+    } else if (d.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      dt = new Date(d);
+    } else if (d.length === 10 && /^\d{4}\.\d{2}\.\d{2}$/.test(d)) {
+      dt = new Date(d.replace(/\./g, '-'));
+    }
+    if (dt && !isNaN(dt.getTime())) {
+      if (!minDate || dt < minDate) {
+        minDate = dt;
+        minRaw = d;
+      }
+    }
+  });
+  // 변환 실패시 첫 번째 값 fallback
+  return minRaw || (expDates.length > 0 ? expDates[0] : '');
+}
+
+// 날짜 문자열을 Date 객체로 변환 (YYMMDD, YYYY-MM-DD, YYYY.MM.DD 지원)
+function parseDate(str) {
+  if (!str) return null;
+  if (str.length === 6 && /^\d{6}$/.test(str)) {
+    // YYMMDD → Date
+    return new Date('20' + str.substr(0,2) + '-' + str.substr(2,2) + '-' + str.substr(4,2));
+  }
+  if (str.length === 10 && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    return new Date(str);
+  }
+  if (str.length === 10 && /^\d{4}\.\d{2}\.\d{2}$/.test(str)) {
+    return new Date(str.replace(/\./g, '-'));
+  }
+  return null;
+}
+
 /**
  * 입출고기록 시트 전체를 분석하여 제조사별 재고표 시트를 생성/업데이트
  * - 사이즈별 재고수량, 가장 짧은 유효기간 표시
  * - 입고는 +1, 출고/사용은 -1로 집계
  */
 function updateAllManufacturerStockSheets() {
-  // 모델타입별 색상 매핑 테이블 (전체 문자열 기준)
-  var MODEL_TYPE_COLORS = {
-    'UF2': '#B3E5FC', // 밝은 하늘색
-    'UF3': '#E3F2FD', // 더 밝은 하늘색
-    'UV3': '#FFF9C4', // 밝은 노랑
-    // 필요시 추가
-  };
-  var DEFAULT_COLOR = '#FFFFFF';
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var stockSheet = ss.getSheetByName('현재고 정보');
   var data = stockSheet.getDataRange().getValues();
@@ -64,30 +126,12 @@ function updateAllManufacturerStockSheets() {
       Object.keys(sizeMap).forEach(function(size) {
         var count = sizeMap[size].count;
         var expDates = sizeMap[size].expDates;
-        var minExp = '';
-        if (expDates.length > 0) {
-          var dateObjs = expDates
-            .map(function(d) {
-              if (typeof d !== 'string') return null;
-              if (d.length === 6) {
-                return new Date('20' + d.substr(0,2) + '-' + d.substr(2,2) + '-' + d.substr(4,2));
-              }
-              return new Date(d.replace(/\./g, '-'));
-            })
-            .filter(function(dt) { return dt && !isNaN(dt.getTime()); });
-          if (dateObjs.length > 0) {
-            var minDate = new Date(Math.min.apply(null, dateObjs));
-            minExp = expDates[dateObjs.findIndex(function(dt) {
-              return dt && dt.getTime() === minDate.getTime();
-            })];
-          } else {
-            minExp = expDates[0];
-          }
-        }
-        sheet.appendRow([modelType, size, count, minExp]);
-        // 모델타입별 셀 배경색 지정 (전체 문자열 기준)
+        var minExp = getEarliestExpDate(expDates);
+        var minExpDate = parseDate(minExp);
+        sheet.appendRow([modelType, size, count, minExpDate || minExp || '']);
+        // 모델타입별 셀 배경색 지정 (동적 색상)
         var rowIdx = sheet.getLastRow();
-        var color = MODEL_TYPE_COLORS[modelType] || DEFAULT_COLOR;
+        var color = getColorByModelType(modelType);
         sheet.getRange(rowIdx, 1, 1, 4).setBackground(color);
       });
     });

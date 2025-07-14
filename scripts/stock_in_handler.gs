@@ -50,7 +50,7 @@ function addBarcodeInfoIfNotExist(sheetBarcode, barcode, info) {
     if (row) return row; // 이미 있으면 해당 행 반환
     var lastRow = sheetBarcode.getLastRow();
     var newRow = lastRow + 1;
-    var size = getSizeByModel(info.model, info.serialNo);
+    var size = getSizeByModel(info.serialNo, info);
     sheetBarcode.getRange(newRow, 1).setValue(barcode); // A: 바코드
     if (info.typeList && info.typeList.length > 0) {
       setProductTypeDropdown(newRow, info.typeList);
@@ -83,6 +83,7 @@ function handleStockIn() {
   var lastRow = sheetInput.getLastRow();
   for (var i = 2; i <= lastRow; i++) {
     var barcode = sheetInput.getRange('A' + i).getValue();
+
     if (!barcode) continue;
     var info = parseBarcode(barcode);
     var row = findBarcodeRowByBarcode(sheetBarcode, barcode);
@@ -120,6 +121,7 @@ function handleStockIn() {
     var barcodeRow = sheetBarcode.getRange(row, 1, 1, sheetBarcode.getLastColumn()).getValues()[0];
     barcodeRow[0] = barcode; // 반드시 입고입력에서 입력한 바코드로 대입
     // 입고날짜(오늘 날짜) + 바코드 정보 전체 컬럼을 합쳐서 현재고 정보에 입력
+    var size = getSizeByModel(info.serialNo, info);
     var newRow = [new Date()].concat(barcodeRow);
     sheetStock.insertRowsBefore(2, 1); // 2행(헤더 아래)에 삽입
     sheetStock.getRange(2, 1, 1, newRow.length).setValues([newRow]);
